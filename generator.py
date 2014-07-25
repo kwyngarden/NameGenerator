@@ -3,6 +3,8 @@ from random import choice, sample
 
 VOWELS = 'aeiou'
 CONSONANTS = 'bcdfghjklmnpqrstvwxyz'
+VOWEL_GROUP_MAX_LEN = 2
+CONSONANT_GROUP_MAX_LEN = 3
 
 class NameGeneratorModel:
     
@@ -43,9 +45,9 @@ class NameGeneratorModel:
                 if is_first_group:
                     self._process_first_group(current_group, current_group_is_vowels)
                     is_first_group = False
-                if current_group_is_vowels:
+                if current_group_is_vowels and len(current_group) <= VOWEL_GROUP_MAX_LEN:
                     self.vowel_groups.append(current_group)
-                else:
+                elif not current_group_is_vowels and len(current_group) <= CONSONANT_GROUP_MAX_LEN:
                     self.consonant_groups.append(current_group)
                 current_group_is_vowels = not current_group_is_vowels
                 current_group = '' + word[i]
@@ -61,15 +63,16 @@ class NameGeneratorModel:
         self.bigram_map = {}
 
         for word in words:
-            if len(word) > 3:
-                self._get_letter_groupings_and_bigrams(word)
+            self._get_letter_groupings_and_bigrams(word)
 
 
 def get_english_words():
     english_dict = open('words.txt')
     words = set()
     for word in english_dict.readlines():
-        words.add(word.strip().lower())
+        word = word.strip()
+        if word.islower() and len(word) >= 3:
+            words.add(word)
     english_dict.close()
     return words
 
