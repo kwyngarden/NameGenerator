@@ -1,30 +1,32 @@
 #!/usr/bin/python
 from argparse import ArgumentParser
 from math import floor
-from nltk.util import bigrams
-from optparse import OptionParser
 from random import choice, normalvariate, random, sample
+
 
 VOWELS = 'aeiou'
 CONSONANTS = 'bcdfghjklmnpqrstvwxyz'
+
+# The number of consecutive vowels or consonants are allowed
 VOWEL_GROUP_MAX_LEN = 2
 CONSONANT_GROUP_MAX_LEN = 3
+
+# The allowed range for number of consonant and vowel groups in a word and
+# some constants for adjusting the normal distribution that generates the
+# number of groups.
 MIN_NUM_GROUPS = 3
 MAX_NUM_GROUPS = 7
-
-START_VOWEL_PROB = 0.425 # Historically accurate for US first names
-LAST_NAME_LENGTH_EXTENSION = 0.5
 DEFAULT_MEAN_NUM_GROUPS = 4.5
+NUM_GROUPS_DEVIATION = 1.0
+LAST_NAME_LENGTH_EXTENSION = 0.5
 MEAN_GROUPS_OPTION_ADJUSTMENT = 1.0
+
+# Probability that a name starts with a vowel; about right for US first names
+START_VOWEL_PROB = 0.425
 
 
 class NameGeneratorModel:
     
-    def _add_char_bigram(self, first, second):
-        following_chars = self.bigram_map.get(first, [])
-        following_chars.append(second)
-        self.bigram_map[first] = following_chars
-
     def get_start_group(self, use_vowels):
         if use_vowels:
             return choice(self.start_groups_vowels)
@@ -46,6 +48,11 @@ class NameGeneratorModel:
             self.start_groups_vowels.append(group)
         else:
             self.start_groups_consonants.append(group)
+    
+    def _add_char_bigram(self, first, second):
+        following_chars = self.bigram_map.get(first, [])
+        following_chars.append(second)
+        self.bigram_map[first] = following_chars
 
     def _process_word(self, word):
         vowel_groups = []
@@ -57,17 +64,26 @@ class NameGeneratorModel:
         for i in range(len(word)):
             if (word[i] in VOWELS) == current_group_is_vowels:
                 current_group += word[i]
+            
             elif current_group:
                 self._add_char_bigram(current_group[-1], word[i])
                 if is_first_group:
-                    self._process_first_group(current_group, current_group_is_vowels)
+                    self._process_first_group(
+                        current_group,
+                        current_group_is_vowels
+                    )
                     is_first_group = False
-                if current_group_is_vowels and len(current_group) <= VOWEL_GROUP_MAX_LEN:
+                
+                if current_group_is_vowels and \
+                    len(current_group) <= VOWEL_GROUP_MAX_LEN:
                     self.vowel_groups.append(current_group)
-                elif not current_group_is_vowels and len(current_group) <= CONSONANT_GROUP_MAX_LEN:
+                elif (not current_group_is_vowels) and \
+                    len(current_group) <= CONSONANT_GROUP_MAX_LEN:
                     self.consonant_groups.append(current_group)
+                
                 current_group_is_vowels = not current_group_is_vowels
                 current_group = '' + word[i]
+            
             else:
                 current_group_is_vowels = not current_group_is_vowels
                 current_group = '' + word[i]
@@ -111,7 +127,7 @@ def get_english_words(dict_filename):
     return words
 
 def get_num_letter_groups(mean_groups):
-    groups = int(floor(normalvariate(mean_groups, 1.0)))
+    groups = int(floor(normalvariate(mean_groups, NUM_GROUPS_DEVIATION)))
     return clamp(groups, MIN_NUM_GROUPS, MAX_NUM_GROUPS)
 
 def get_name_component(model, english_words, mean_groups, start_with_vowel):
@@ -129,6 +145,7 @@ def get_title(english_words):
         'Captain of the',
         'Commander of the',
         'Defender of the',
+        'Duke of ',
         'King beyond the',
         'King in the',
         'King of the',
@@ -138,6 +155,7 @@ def get_title(english_words):
         'Master of the',
         'Prince of the',
         'Protector of the',
+        'Rider of ',
     ]
     words = sample(english_words, 2)
     return '{identifier} {word1} {word2}'.format(
@@ -146,9 +164,19 @@ def get_title(english_words):
         word2=words[1].capitalize(),
     )
 
-def get_name(model, english_words, num_letter_groups, use_titles):
-    first = get_name_component(model, english_words, num_letter_groups, random() < START_VOWEL_PROB)
-    last = get_name_component(model, english_words, num_letter_groups + LAST_NAME_LENGTH_EXTENSION, random() < START_VOWEL_PROB)
+def get_name(model, english_words, mean_letter_groups, use_titles):
+    first = get_name_component(
+        model,
+        english_words,
+        mean_letter_groups,
+        random() < START_VOWEL_PROB,
+    )
+    last = get_name_component(
+        model,
+        english_words,
+        mean_letter_groups + LAST_NAME_LENGTH_EXTENSION,
+        random() < START_VOWEL_PROB,
+    )
     full_name = first + ' ' + last
     if use_titles:
         full_name += ', ' + get_title(english_words)
