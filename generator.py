@@ -6,6 +6,7 @@ from random import choice, normalvariate, random, sample
 
 VOWELS = 'aeiou'
 CONSONANTS = 'bcdfghjklmnpqrstvwxyz'
+DEFAULT_NUM_NAMES = 10
 
 # The number of consecutive vowels or consonants are allowed
 VOWEL_GROUP_MAX_LEN = 2
@@ -21,9 +22,9 @@ NUM_GROUPS_DEVIATION = 1.0
 LAST_NAME_LENGTH_EXTENSION = 0.5
 MEAN_GROUPS_OPTION_ADJUSTMENT = 1.0
 
-# Probability that a name starts with a vowel; about right for US first names
-START_VOWEL_PROB = 0.425
-
+# Probability that a name starts with a vowel. This is slightly higher than
+# the percentages for US first and last names.
+START_VOWEL_PROB = 0.15
 
 class NameGeneratorModel:
     
@@ -42,12 +43,6 @@ class NameGeneratorModel:
         next_letter = choice(self.bigram_map.get(letter))
         group_list = self.end_groups_consonants if letter in VOWELS else self.end_groups_vowels
         return choice([group for group in group_list if group.startswith(next_letter)])
- 
-    def _process_first_group(self, group, is_vowels):
-        if is_vowels:
-            self.start_groups_vowels.append(group)
-        else:
-            self.start_groups_consonants.append(group)
     
     def _add_char_bigram(self, first, second):
         following_chars = self.bigram_map.get(first, [])
@@ -67,23 +62,21 @@ class NameGeneratorModel:
             
             elif current_group:
                 self._add_char_bigram(current_group[-1], word[i])
-                if is_first_group:
-                    self._process_first_group(
-                        current_group,
-                        current_group_is_vowels
-                    )
-                    is_first_group = False
                 
-                if current_group_is_vowels and \
-                    len(current_group) <= VOWEL_GROUP_MAX_LEN:
+                if current_group_is_vowels and len(current_group) <= VOWEL_GROUP_MAX_LEN:
                     self.vowel_groups.append(current_group)
-                elif (not current_group_is_vowels) and \
-                    len(current_group) <= CONSONANT_GROUP_MAX_LEN:
+                    if is_first_group:
+                        self.start_groups_vowels.append(current_group)
+                
+                elif (not current_group_is_vowels) and len(current_group) <= CONSONANT_GROUP_MAX_LEN:
                     self.consonant_groups.append(current_group)
+                    if is_first_group:
+                        self.start_groups_consonants.append(current_group)
                 
                 current_group_is_vowels = not current_group_is_vowels
                 current_group = '' + word[i]
-            
+                is_first_group = False
+
             else:
                 current_group_is_vowels = not current_group_is_vowels
                 current_group = '' + word[i]
@@ -92,6 +85,7 @@ class NameGeneratorModel:
             if len(current_group) <= VOWEL_GROUP_MAX_LEN:
                 self.vowel_groups.append(current_group)
             self.end_groups_vowels.append(current_group)
+
         else:
             if len(current_group) <= CONSONANT_GROUP_MAX_LEN:
                 self.consonant_groups.append(current_group)
@@ -145,7 +139,7 @@ def get_title(english_words):
         'Captain of the',
         'Commander of the',
         'Defender of the',
-        'Duke of ',
+        'Duke of',
         'King beyond the',
         'King in the',
         'King of the',
@@ -155,7 +149,7 @@ def get_title(english_words):
         'Master of the',
         'Prince of the',
         'Protector of the',
-        'Rider of ',
+        'Rider of',
     ]
     words = sample(english_words, 2)
     return '{identifier} {word1} {word2}'.format(
@@ -164,7 +158,12 @@ def get_title(english_words):
         word2=words[1].capitalize(),
     )
 
-def get_name(model, english_words, mean_letter_groups, use_titles):
+def get_name(
+    model,
+    english_words,
+    mean_letter_groups,
+    use_titles,
+):
     first = get_name_component(
         model,
         english_words,
@@ -184,7 +183,7 @@ def get_name(model, english_words, mean_letter_groups, use_titles):
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Procedural name generator, with optional fun titles appended to the generated names.')
-    parser.add_argument('-n', '--num-names', type=int, default=5, help='Number of names to generate')
+    parser.add_argument('-n', '--num-names', type=int, default=DEFAULT_NUM_NAMES, help='Number of names to generate')
     parser.add_argument('-t', '--use-titles', action='store_true', help='Append titles to names')
     parser.add_argument('-d', '--large-dict', action='store_true', help='Train name generator with larger dictionary')
     parser.add_argument('-f', '--dict-file', help='Newline-separated dictionary file on which to train names')
